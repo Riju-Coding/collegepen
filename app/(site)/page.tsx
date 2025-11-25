@@ -21,6 +21,10 @@ export default function HomePage() {
   const [selectedStream, setSelectedStream] = useState<string | null>(null)
   const [streamsLoading, setStreamsLoading] = useState(true)
   const [coursesLoading, setCoursesLoading] = useState(false)
+  
+  // Popular Streams State
+  const [popularStreams, setPopularStreams] = useState<any[]>([])
+  const [popularStreamsLoading, setPopularStreamsLoading] = useState(true)
 
   useEffect(() => {
     let cancelled = false
@@ -61,6 +65,10 @@ export default function HomePage() {
         }))
         setStreams(streamsData)
         
+        // Also set popular streams (same data)
+        setPopularStreams(streamsData)
+        setPopularStreamsLoading(false)
+        
         // Select first stream by default
         if (streamsData.length > 0) {
           setSelectedStream(streamsData[0].id)
@@ -69,6 +77,7 @@ export default function HomePage() {
       } catch (error) {
         console.error("Error fetching streams:", error)
         setStreamsLoading(false)
+        setPopularStreamsLoading(false)
       }
     }
 
@@ -128,15 +137,6 @@ export default function HomePage() {
     }
   ]
 
-  const popularStreams = [
-    { name: "Engineering", icon: "⚙️", count: "200+" },
-    { name: "Medical", icon: "🏥", count: "150+" },
-    { name: "Management", icon: "💼", count: "180+" },
-    { name: "Arts & Science", icon: "🎨", count: "220+" },
-    { name: "Law", icon: "⚖️", count: "80+" },
-    { name: "Design", icon: "✨", count: "60+" }
-  ]
-
   const whyChooseUs = [
     "Comprehensive database of colleges across India",
     "Verified information and authentic student reviews",
@@ -158,19 +158,40 @@ export default function HomePage() {
             <h2 className="text-4xl font-bold text-slate-900 mb-4">Popular Streams</h2>
             <p className="text-lg text-slate-600">Explore colleges by your field of interest</p>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            {popularStreams.map((stream, i) => (
-              <Link
-                key={i}
-                href={`/colleges?stream=${stream.name.toLowerCase()}`}
-                className="group bg-slate-50 hover:bg-gradient-to-br hover:from-blue-50 hover:to-indigo-50 border border-slate-200 hover:border-blue-300 rounded-2xl p-6 text-center transition-all hover:shadow-lg hover:-translate-y-1"
-              >
-                <div className="text-4xl mb-3 group-hover:scale-110 transition-transform">{stream.icon}</div>
-                <h3 className="font-bold text-slate-900 mb-1">{stream.name}</h3>
-                <p className="text-sm text-slate-600">{stream.count} colleges</p>
-              </Link>
-            ))}
-          </div>
+          {popularStreamsLoading ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+            </div>
+          ) : popularStreams.length > 0 ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              {popularStreams.map((stream) => (
+                <Link
+                  key={stream.id}
+                  href={`/colleges?stream=${stream.name.toLowerCase()}`}
+                  className="group bg-slate-50 hover:bg-gradient-to-br hover:from-blue-50 hover:to-indigo-50 border border-slate-200 hover:border-blue-300 rounded-2xl p-6 text-center transition-all hover:shadow-lg hover:-translate-y-1"
+                >
+                  {stream.icon ? (
+                    <img
+                      src={stream.icon}
+                      alt={stream.name}
+                      className="w-16 h-16 mx-auto mb-3 rounded-lg object-cover group-hover:scale-110 transition-transform"
+                    />
+                  ) : (
+                    <div className="text-4xl mb-3 group-hover:scale-110 transition-transform">📚</div>
+                  )}
+                  <h3 className="font-bold text-slate-900 mb-1">{stream.name}</h3>
+                  {stream.details && (
+                    <p className="text-sm text-slate-600">{stream.details}</p>
+                  )}
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-16">
+              <BookOpen className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+              <p className="text-slate-500 text-lg">No streams available yet.</p>
+            </div>
+          )}
         </div>
       </section>
 
