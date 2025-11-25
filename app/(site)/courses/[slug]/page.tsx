@@ -1,17 +1,19 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { collection, getDocs, query, where } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { SiteHeader } from "@/components/frontend/site-header"
 import { SiteFooter } from "@/components/frontend/site-footer"
 import { CollegeCard } from "@/components/frontend/college-card"
-import { BookOpen, Loader2, GraduationCap, Filter, MapPin } from "lucide-react"
+import { BookOpen, Loader2, GraduationCap, Filter, MapPin, ArrowRight, Phone } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import Link from "next/link"
 
 export default function CoursePage() {
   const params = useParams()
+  const router = useRouter()
   const slug = params.slug as string
 
   const [course, setCourse] = useState<any>(null)
@@ -133,12 +135,61 @@ export default function CoursePage() {
               </div>
             )}
             <div className="flex-1">
-              <h1 className="text-4xl md:text-5xl font-bold text-white mb-3">
-                {course.name}
-              </h1>
+              <div className="flex items-center justify-between gap-6 mb-3">
+                <h1 className="text-4xl md:text-5xl font-bold text-white">
+                  {course.name}
+                </h1>
+                
+                {/* Action Buttons */}
+                <div className="hidden md:flex items-center gap-3">
+                  <Link href={`/courses/${slug}/details`}>
+                    <Button size="lg" className="bg-white text-blue-600 hover:bg-blue-50 shadow-lg">
+                      <BookOpen className="w-5 h-5 mr-2" />
+                      Explore Program
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  </Link>
+                  <Button 
+                    size="lg" 
+                    variant="outline" 
+                    className="bg-white/10 text-white border-white/30 hover:bg-white/20 backdrop-blur-sm"
+                    onClick={() => {
+                      // You can add consultation logic here or link to a contact form
+                      window.location.href = '/contact?type=consultation'
+                    }}
+                  >
+                    <Phone className="w-5 h-5 mr-2" />
+                    Get Consultation
+                  </Button>
+                </div>
+              </div>
+
               {course.details && (
                 <p className="text-blue-100 text-lg mb-4">{course.details}</p>
               )}
+              
+              {/* Mobile Action Buttons */}
+              <div className="flex md:hidden flex-wrap gap-3 mb-4">
+                <Link href={`/courses/${slug}/details`}>
+                  <Button size="lg" className="bg-white text-blue-600 hover:bg-blue-50 shadow-lg">
+                    <BookOpen className="w-5 h-5 mr-2" />
+                    Explore Program
+                    <ArrowRight className="w-4 h-4 ml-2" />
+                  </Button>
+                </Link>
+                <Button 
+                  size="lg" 
+                  variant="outline" 
+                  className="bg-white/10 text-white border-white/30 hover:bg-white/20 backdrop-blur-sm"
+                  onClick={() => {
+                    window.location.href = '/contact?type=consultation'
+                  }}
+                >
+                  <Phone className="w-5 h-5 mr-2" />
+                  Get Consultation
+                </Button>
+              </div>
+
               <div className="flex flex-wrap gap-3">
                 {course.eligibility && (
                   <div className="px-4 py-2 bg-white/10 backdrop-blur-sm rounded-lg border border-white/20">

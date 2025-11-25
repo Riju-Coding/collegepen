@@ -7,32 +7,40 @@ import { db } from "@/lib/firebase"
 import { SiteHeader } from "@/components/frontend/site-header"
 import { SiteFooter } from "@/components/frontend/site-footer"
 import { CollegeCard } from "@/components/frontend/college-card"
-import { Search, Building2, Loader2, TrendingUp, Filter, MapPin, X } from "lucide-react"
+import { Search, Building2, Loader2, TrendingUp, Filter, MapPin, X, ChevronDown, SlidersHorizontal } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Checkbox } from "@/components/ui/checkbox"
 import Link from "next/link"
-
-// Resolve a slug/name to a doc id from a collection's docs
-function resolveIdBySlugOrName(list: any[], slugOrName?: string | null) {
-  if (!slugOrName) return undefined
-  const s = String(slugOrName).toLowerCase()
-  const hit =
-    list.find((x: any) => (x.slug || x.nameSlug)?.toLowerCase?.() === s) ||
-    list.find((x: any) => x.name?.toLowerCase?.() === s)
-  return hit?.id
-}
 
 export default function CollegesPage() {
   const sp = useSearchParams()
   const urlQuery = sp.get("q")
-  const streamSlug = sp.get("stream")
-  const courseSlug = sp.get("course")
 
   const [loading, setLoading] = useState(true)
   const [colleges, setColleges] = useState<any[]>([])
   const [streams, setStreams] = useState<any[]>([])
   const [courses, setCourses] = useState<any[]>([])
+  const [states, setStates] = useState<any[]>([])
+  const [cities, setCities] = useState<any[]>([])
   const [searchTerm, setSearchTerm] = useState(urlQuery || "")
+  
+  // Filter states
+  const [selectedStreams, setSelectedStreams] = useState<string[]>([])
+  const [selectedCourses, setSelectedCourses] = useState<string[]>([])
+  const [selectedStates, setSelectedStates] = useState<string[]>([])
+  const [selectedCities, setSelectedCities] = useState<string[]>([])
+  
+  // Mobile filter drawer
+  const [showMobileFilters, setShowMobileFilters] = useState(false)
+  
+  // Accordion states
+  const [expandedSections, setExpandedSections] = useState({
+    streams: true,
+    courses: true,
+    states: true,
+    cities: true,
+  })
 
   useEffect(() => {
     setSearchTerm(urlQuery || "")
@@ -42,16 +50,20 @@ export default function CollegesPage() {
     let cancelled = false
     ;(async () => {
       try {
-        const [colSnap, streamSnap, courseSnap] = await Promise.all([
+        const [colSnap, streamSnap, courseSnap, stateSnap, citySnap] = await Promise.all([
           getDocs(query(collection(db, "colleges"), orderBy("name"))),
           getDocs(query(collection(db, "streams"), orderBy("name"))),
           getDocs(query(collection(db, "courses"), orderBy("name"))),
+          getDocs(query(collection(db, "states"), orderBy("name"))),
+          getDocs(query(collection(db, "cities"), orderBy("name"))),
         ])
         const toDocs = (s: any) => s.docs.map((d: any) => ({ id: d.id, ...d.data() }))
         if (!cancelled) {
           setColleges(toDocs(colSnap))
           setStreams(toDocs(streamSnap))
           setCourses(toDocs(courseSnap))
+          setStates(toDocs(stateSnap))
+          setCities(toDocs(citySnap))
           setLoading(false)
         }
       } catch (e) {
@@ -66,7 +78,8 @@ export default function CollegesPage() {
 
   const filtered = useMemo(() => {
     let out = [...colleges]
-    // text search
+    
+    // Text search
     const q = searchTerm || urlQuery
     if (q) {
       const s = q.toLowerCase()
@@ -74,46 +87,189 @@ export default function CollegesPage() {
         [c.name, c.cityName, c.stateName].filter(Boolean).some((v) => String(v).toLowerCase().includes(s)),
       )
     }
-    // stream filter by resolving slug/name to id and checking array of stream ids
-    if (streamSlug) {
-      const streamId = resolveIdBySlugOrName(streams, streamSlug)
-      if (streamId) {
-        out = out.filter((c) => Array.isArray(c.streams) && c.streams.includes(streamId))
-      }
+    
+    // Stream filter
+    if (selectedStreams.length > 0) {
+      out = out.filter((c) => 
+        Array.isArray(c.streams) && 
+        c.streams.some((streamId: string) => selectedStreams.includes(streamId))
+      )
     }
-    // course filter by resolving slug/name to id and checking courses[].courseId
-    if (courseSlug) {
-      const courseId = resolveIdBySlugOrName(courses, courseSlug)
-      if (courseId) {
-        out = out.filter(
-          (c) =>
-            Array.isArray(c.courses) &&
-            c.courses.some((entry: any) => entry?.courseId === courseId || entry === courseId),
+    
+    // Course filter
+    if (selectedCourses.length > 0) {
+      out = out.filter((c) =>
+        Array.isArray(c.courses) &&
+        c.courses.some((entry: any) => 
+          selectedCourses.includes(entry?.courseId || entry)
         )
-      }
+      )
     }
+    
+    // State filter
+    if (selectedStates.length > 0) {
+      out = out.filter((c) => selectedStates.includes(c.stateId))
+    }
+    
+    // City filter
+    if (selectedCities.length > 0) {
+      out = out.filter((c) => selectedCities.includes(c.cityId))
+    }
+    
     return out
-  }, [colleges, streams, courses, searchTerm, urlQuery, streamSlug, courseSlug])
+  }, [colleges, searchTerm, urlQuery, selectedStreams, selectedCourses, selectedStates, selectedCities])
 
-  // Get active filter names
-  const activeStream = useMemo(() => {
-    if (!streamSlug) return null
-    const streamId = resolveIdBySlugOrName(streams, streamSlug)
-    return streams.find(s => s.id === streamId)
-  }, [streamSlug, streams])
+  // Available cities based on selected states
+  const availableCities = useMemo(() => {
+    if (selectedStates.length === 0) return cities
+    return cities.filter(city => selectedStates.includes(city.stateId))
+  }, [cities, selectedStates])
 
-  const activeCourse = useMemo(() => {
-    if (!courseSlug) return null
-    const courseId = resolveIdBySlugOrName(courses, courseSlug)
-    return courses.find(c => c.id === courseId)
-  }, [courseSlug, courses])
-
-  const hasFilters = urlQuery || streamSlug || courseSlug
+  const hasFilters = selectedStreams.length > 0 || selectedCourses.length > 0 || 
+                     selectedStates.length > 0 || selectedCities.length > 0 || urlQuery
 
   const clearFilters = () => {
     setSearchTerm("")
-    window.location.href = "/colleges"
+    setSelectedStreams([])
+    setSelectedCourses([])
+    setSelectedStates([])
+    setSelectedCities([])
   }
+
+  const toggleSection = (section: keyof typeof expandedSections) => {
+    setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }))
+  }
+
+  const FilterSection = ({ 
+    title, 
+    items, 
+    selectedItems, 
+    onToggle, 
+    section 
+  }: { 
+    title: string
+    items: any[]
+    selectedItems: string[]
+    onToggle: (id: string) => void
+    section: keyof typeof expandedSections
+  }) => (
+    <div className="border-b border-slate-200 pb-4">
+      <button
+        onClick={() => toggleSection(section)}
+        className="w-full flex items-center justify-between py-3 text-left"
+      >
+        <h3 className="font-semibold text-slate-900">{title}</h3>
+        <ChevronDown 
+          className={`w-5 h-5 text-slate-400 transition-transform ${
+            expandedSections[section] ? 'rotate-180' : ''
+          }`}
+        />
+      </button>
+      
+      {expandedSections[section] && (
+        <div className="space-y-3 mt-2 max-h-64 overflow-y-auto">
+          {items.map((item) => (
+            <label
+              key={item.id}
+              className="flex items-center gap-3 cursor-pointer group"
+            >
+              <Checkbox
+                checked={selectedItems.includes(item.id)}
+                onCheckedChange={() => onToggle(item.id)}
+                className="border-slate-300"
+              />
+              <span className="text-sm text-slate-700 group-hover:text-slate-900">
+                {item.name}
+              </span>
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+
+  const FiltersContent = () => (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+        <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+          <SlidersHorizontal className="w-5 h-5" />
+          Filters
+        </h2>
+        {hasFilters && (
+          <button
+            onClick={clearFilters}
+            className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+          >
+            Clear All
+          </button>
+        )}
+      </div>
+
+      {/* Active Filters Count */}
+      {hasFilters && (
+        <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
+          <p className="text-sm text-blue-900">
+            <span className="font-semibold">
+              {selectedStreams.length + selectedCourses.length + selectedStates.length + selectedCities.length}
+            </span>
+            {' '}filters active
+          </p>
+        </div>
+      )}
+
+      <FilterSection
+        title="Streams"
+        items={streams}
+        selectedItems={selectedStreams}
+        onToggle={(id) => setSelectedStreams(prev => 
+          prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+        )}
+        section="streams"
+      />
+
+      <FilterSection
+        title="Courses"
+        items={courses}
+        selectedItems={selectedCourses}
+        onToggle={(id) => setSelectedCourses(prev => 
+          prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+        )}
+        section="courses"
+      />
+
+      <FilterSection
+        title="States"
+        items={states}
+        selectedItems={selectedStates}
+        onToggle={(id) => {
+          setSelectedStates(prev => {
+            const newStates = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+            // Clear city selections if state is deselected
+            if (!newStates.includes(id)) {
+              setSelectedCities(curr => 
+                curr.filter(cityId => {
+                  const city = cities.find(c => c.id === cityId)
+                  return city && newStates.includes(city.stateId)
+                })
+              )
+            }
+            return newStates
+          })
+        }}
+        section="states"
+      />
+
+      <FilterSection
+        title="Cities"
+        items={availableCities}
+        selectedItems={selectedCities}
+        onToggle={(id) => setSelectedCities(prev => 
+          prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+        )}
+        section="cities"
+      />
+    </div>
+  )
 
   return (
     <main className="flex flex-col min-h-screen bg-slate-50">
@@ -134,7 +290,7 @@ export default function CollegesPage() {
             </p>
 
             {/* Search Bar */}
-            <div className="relative max-w-2xl mx-auto">
+            <div className="relative max-w-2xl mx-auto mb-12">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
               <Input
                 type="text"
@@ -144,122 +300,149 @@ export default function CollegesPage() {
                 className="w-full pl-12 pr-4 py-6 text-lg bg-white rounded-xl border-0 shadow-xl focus:ring-2 focus:ring-white/50"
               />
             </div>
+
+            {/* Stats Section */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 p-4 text-center">
+                <div className="text-3xl font-bold text-white mb-1">
+                  {loading ? "..." : colleges.length}
+                </div>
+                <div className="text-blue-100 text-sm">Total Colleges</div>
+              </div>
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 p-4 text-center">
+                <div className="text-3xl font-bold text-white mb-1">
+                  {loading ? "..." : streams.length}
+                </div>
+                <div className="text-blue-100 text-sm">Streams</div>
+              </div>
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 p-4 text-center">
+                <div className="text-3xl font-bold text-white mb-1">
+                  {loading ? "..." : courses.length}
+                </div>
+                <div className="text-blue-100 text-sm">Courses</div>
+              </div>
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 p-4 text-center">
+                <div className="text-3xl font-bold text-white mb-1">50K+</div>
+                <div className="text-blue-100 text-sm">Students Helped</div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Stats Section */}
-      <section className="w-full bg-white border-b border-slate-200 py-8">
+      {/* Main Content with Filters */}
+      <section className="w-full py-8">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-blue-600 mb-1">
-                {loading ? "..." : colleges.length}
+          <div className="flex gap-8">
+            {/* Desktop Filters Sidebar */}
+            <aside className="hidden lg:block w-80 flex-shrink-0">
+              <div className="sticky top-24 bg-white rounded-2xl border border-slate-200 shadow-sm p-6 max-h-[calc(100vh-120px)] overflow-y-auto">
+                <FiltersContent />
               </div>
-              <div className="text-slate-600 text-sm">Total Colleges</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-blue-600 mb-1">
-                {loading ? "..." : streams.length}
-              </div>
-              <div className="text-slate-600 text-sm">Streams</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-blue-600 mb-1">
-                {loading ? "..." : courses.length}
-              </div>
-              <div className="text-slate-600 text-sm">Courses</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-blue-600 mb-1">50K+</div>
-              <div className="text-slate-600 text-sm">Students Helped</div>
+            </aside>
+
+            {/* Main Content */}
+            <div className="flex-1 min-w-0">
+              {loading ? (
+                <div className="flex items-center justify-center py-20">
+                  <Loader2 className="w-12 h-12 animate-spin text-blue-600" />
+                  <span className="ml-3 text-slate-600 text-lg">Loading colleges...</span>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <h2 className="text-2xl font-bold text-slate-900">
+                        {hasFilters ? "Filtered Results" : "All Colleges"}
+                      </h2>
+                      <p className="text-slate-600 mt-1">
+                        Showing {filtered.length} {filtered.length === 1 ? 'college' : 'colleges'}
+                      </p>
+                    </div>
+                    
+                    {/* Mobile Filter Button */}
+                    <Button 
+                      onClick={() => setShowMobileFilters(true)}
+                      className="lg:hidden flex items-center gap-2"
+                    >
+                      <Filter className="w-4 h-4" />
+                      Filters
+                      {hasFilters && (
+                        <span className="bg-white text-blue-600 px-2 py-0.5 rounded-full text-xs font-bold">
+                          {selectedStreams.length + selectedCourses.length + selectedStates.length + selectedCities.length}
+                        </span>
+                      )}
+                    </Button>
+                  </div>
+
+                  {filtered.length > 0 ? (
+                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+                      {filtered.map((c) => (
+                        <CollegeCard key={c.id} college={c} />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-20 bg-white rounded-2xl border border-slate-200">
+                      <MapPin className="w-20 h-20 text-slate-300 mx-auto mb-6" />
+                      <h3 className="text-2xl font-bold text-slate-900 mb-3">No Colleges Found</h3>
+                      <p className="text-slate-600 mb-2">
+                        We couldn't find any colleges matching your criteria
+                      </p>
+                      <p className="text-slate-500 text-sm mb-6">Try adjusting your search or filters</p>
+                      <Button onClick={clearFilters} variant="outline">
+                        Clear Filters
+                      </Button>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
         </div>
       </section>
 
-      {/* Active Filters */}
-      {hasFilters && !loading && (
-        <section className="w-full bg-blue-50 border-b border-blue-100 py-4">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="text-sm font-medium text-slate-700">Active Filters:</span>
-              {activeStream && (
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white rounded-lg border border-blue-200 text-sm">
-                  <span className="font-medium text-slate-900">Stream:</span>
-                  <span className="text-blue-600">{activeStream.name}</span>
-                </div>
-              )}
-              {activeCourse && (
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white rounded-lg border border-blue-200 text-sm">
-                  <span className="font-medium text-slate-900">Course:</span>
-                  <span className="text-blue-600">{activeCourse.name}</span>
-                </div>
-              )}
-              {urlQuery && (
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white rounded-lg border border-blue-200 text-sm">
-                  <span className="font-medium text-slate-900">Search:</span>
-                  <span className="text-blue-600">"{urlQuery}"</span>
-                </div>
-              )}
-              <button
-                onClick={clearFilters}
-                className="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium text-slate-700 transition-colors"
-              >
-                <X className="w-3 h-3" />
-                Clear All
-              </button>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Colleges Grid */}
-      <section className="w-full py-16">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          {loading ? (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 className="w-12 h-12 animate-spin text-blue-600" />
-              <span className="ml-3 text-slate-600 text-lg">Loading colleges...</span>
-            </div>
-          ) : filtered.length > 0 ? (
-            <>
-              <div className="flex items-center justify-between mb-8">
-                <div>
-                  <h2 className="text-3xl font-bold text-slate-900">
-                    {hasFilters ? "Search Results" : "All Colleges"}
-                  </h2>
-                  <p className="text-slate-600 mt-1">
-                    Showing {filtered.length} {filtered.length === 1 ? "college" : "colleges"}
-                  </p>
-                </div>
-                <Button variant="outline" className="hidden md:flex gap-2">
-                  <Filter className="w-4 h-4" />
-                  Filter
+      {/* Mobile Filter Drawer */}
+      {showMobileFilters && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setShowMobileFilters(false)}
+          />
+          
+          {/* Drawer */}
+          <div className="absolute right-0 top-0 bottom-0 w-full max-w-sm bg-white shadow-2xl animate-in slide-in-from-right">
+            <div className="flex flex-col h-full">
+              {/* Header */}
+              <div className="flex items-center justify-between p-6 border-b border-slate-200">
+                <h2 className="text-xl font-bold text-slate-900">Filters</h2>
+                <button
+                  onClick={() => setShowMobileFilters(false)}
+                  className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              {/* Content */}
+              <div className="flex-1 overflow-y-auto p-6">
+                <FiltersContent />
+              </div>
+              
+              {/* Footer */}
+              <div className="p-6 border-t border-slate-200 bg-slate-50">
+                <Button 
+                  onClick={() => setShowMobileFilters(false)}
+                  className="w-full"
+                  size="lg"
+                >
+                  View {filtered.length} Colleges
                 </Button>
               </div>
-
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {filtered.map((c) => (
-                  <CollegeCard key={c.id} college={c} />
-                ))}
-              </div>
-            </>
-          ) : (
-            <div className="text-center py-20 bg-white rounded-2xl border border-slate-200">
-              <MapPin className="w-20 h-20 text-slate-300 mx-auto mb-6" />
-              <h3 className="text-2xl font-bold text-slate-900 mb-3">No Colleges Found</h3>
-              <p className="text-slate-600 mb-2">
-                We couldn't find any colleges matching your criteria
-              </p>
-              <p className="text-slate-500 text-sm mb-6">Try adjusting your search or filters</p>
-              <Button onClick={clearFilters} variant="outline">
-                Clear Filters
-              </Button>
             </div>
-          )}
+          </div>
         </div>
-      </section>
+      )}
 
       {/* CTA Section */}
       <section className="w-full bg-gradient-to-br from-blue-600 to-indigo-700 py-16">

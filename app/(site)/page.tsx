@@ -26,7 +26,15 @@ export default function HomePage() {
     let cancelled = false
     ;(async () => {
       try {
-        const snap = await getDocs(query(collection(db, "colleges"), orderBy("name"), limit(8)))
+        // Query only colleges where featured === true
+        const snap = await getDocs(
+          query(
+            collection(db, "colleges"), 
+            where("featured", "==", true),
+            orderBy("name"), 
+            limit(8)
+          )
+        )
         const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
         if (!cancelled) {
           setFeatured(docs)
@@ -166,7 +174,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Featured Courses Section - UPDATED WITH /courses/ PREFIX */}
+      {/* Featured Courses Section */}
       <section className="w-full bg-slate-50 py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mb-12">
@@ -327,26 +335,29 @@ export default function HomePage() {
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {featured.map((c) => (
-                  <CollegeCard key={c.id} college={c} />
-                ))}
-              </div>
-              {!featured.length && (
+              {featured.length > 0 ? (
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {featured.map((c) => (
+                    <CollegeCard key={c.id} college={c} />
+                  ))}
+                </div>
+              ) : (
                 <div className="col-span-full text-center py-16 bg-slate-50 rounded-2xl border border-slate-200">
-                  <BookOpen className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                  <p className="text-slate-500 text-lg">No colleges available yet.</p>
+                  <Sparkles className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                  <p className="text-slate-500 text-lg">No featured colleges available yet.</p>
                   <p className="text-slate-400 text-sm mt-2">Check back soon for updates!</p>
                 </div>
               )}
             </>
           )}
 
-          <div className="mt-8 text-center md:hidden">
-            <Button asChild className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700">
-              <Link href="/colleges">View All Colleges</Link>
-            </Button>
-          </div>
+          {featured.length > 0 && (
+            <div className="mt-8 text-center md:hidden">
+              <Button asChild className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700">
+                <Link href="/colleges">View All Colleges</Link>
+              </Button>
+            </div>
+          )}
         </div>
       </section>
 

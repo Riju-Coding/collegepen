@@ -7,10 +7,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
 import CourseFeeDialog, { type FeesMap } from "@/components/admin/course-fee-dialog"
 import MultiSelect, { type Option } from "@/components/admin/multi-select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Badge } from "@/components/ui/badge"
+import { Star } from "lucide-react"
 
 type Doc = { id: string; name: string; [k: string]: any }
 
@@ -29,6 +33,7 @@ export default function CollegesPage() {
   const [courseFees, setCourseFees] = useState<FeesMap>({})
   const [recruiterIds, setRecruiterIds] = useState<string[]>([])
   const [examIds, setExamIds] = useState<string[]>([])
+  const [featured, setFeatured] = useState(false)
   const [saving, setSaving] = useState(false)
 
   const [rows, setRows] = useState<Doc[]>([])
@@ -129,6 +134,7 @@ export default function CollegesPage() {
         recruiters: recruiterIds,
         entranceExams: examIds,
         about,
+        featured,
         updatedAt: Date.now(),
       }
       if (!editingId) {
@@ -178,6 +184,7 @@ export default function CollegesPage() {
     setCourseFees({})
     setRecruiterIds([])
     setExamIds([])
+    setFeatured(false)
     setOpen(true)
   }
 
@@ -197,6 +204,7 @@ export default function CollegesPage() {
     setCourseFees(rowCourses.reduce<FeesMap>((acc, c) => ({ ...acc, [c.courseId]: c.fee || "" }), {}))
     setRecruiterIds(row.recruiters || [])
     setExamIds(row.entranceExams || [])
+    setFeatured(row.featured || false)
     setOpen(true)
   }
 
@@ -268,6 +276,26 @@ export default function CollegesPage() {
                     onChange={(e) => setEstYear(e.target.value)}
                     placeholder="e.g., 2000"
                     className="mt-1"
+                  />
+                </div>
+
+                {/* Featured Toggle */}
+                <div className="flex items-center justify-between p-4 border border-yellow-200 bg-yellow-50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <Star className="w-5 h-5 text-yellow-600" />
+                    <div>
+                      <Label htmlFor="featured" className="text-sm font-semibold text-slate-900">
+                        Featured College
+                      </Label>
+                      <p className="text-xs text-slate-600 mt-0.5">
+                        Show this college on the homepage featured section
+                      </p>
+                    </div>
+                  </div>
+                  <Switch
+                    id="featured"
+                    checked={featured}
+                    onCheckedChange={setFeatured}
                   />
                 </div>
 
@@ -417,6 +445,7 @@ export default function CollegesPage() {
                 <TableHead>City</TableHead>
                 <TableHead>Streams</TableHead>
                 <TableHead>Courses</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -430,6 +459,14 @@ export default function CollegesPage() {
                     <TableCell>{cityName(r.cityId)}</TableCell>
                     <TableCell>{streamNames(r.streams)}</TableCell>
                     <TableCell>{courseNames(r.courses)}</TableCell>
+                    <TableCell>
+                      {r.featured && (
+                        <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 border-yellow-200">
+                          <Star className="w-3 h-3 mr-1" />
+                          Featured
+                        </Badge>
+                      )}
+                    </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Button variant="outline" size="sm" onClick={() => startEdit(r)}>
